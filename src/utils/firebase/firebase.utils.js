@@ -1,14 +1,15 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 
-import { getFirestore , doc, getDoc, setDoc, snapshotEqual  } from 'firebase/firestore'
+import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore'
 
 import {
   getAuth,
   signInWithRedirect,
   signInWithPopup,
-  GoogleAuthProvider
- } from 'firebase/auth'
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword
+} from 'firebase/auth'
 
 // Firebase configuration
 const firebaseConfig = {
@@ -21,16 +22,16 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const firebaseApp  = initializeApp(firebaseConfig);
-const provider = new GoogleAuthProvider();
+const firebaseApp = initializeApp(firebaseConfig);
+const googleProvider = new GoogleAuthProvider();
 
-provider.setCustomParameters({
+googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
 
 export const auth = getAuth();
-export const signInWithGooglePopup = () => signInWithPopup(auth, provider);
+export const signInWithGooglePopup = () => signInWithPopup(auth, googleProvider);
 
 /* create user in firestore database after being authenticated */
 
@@ -38,14 +39,33 @@ export const signInWithGooglePopup = () => signInWithPopup(auth, provider);
 export const db = getFirestore()
 /* create user docRef then doc awaiting auth to happen */
 
-export const createUserDocumentAfterAuth = async(authUser) =>{
-  
-  const userDocRef = doc(db, 'users', authUser.id)
+export const createUserDocumentFromAuth = async (userAuth , info ={}) => {
+  const userDocRef = doc(db, 'users', userAuth.uid);
 
-  const userSnapshot =  await getDoc(userDocRef)
+  const userSnapshot = await getDoc(userDocRef);
 
-  userSnapshot.exists()
+  if (!userSnapshot.exists()) {
+    const { displayName, email } = userAuth;
+    const createdAt = new Date();
 
+    try {
+      await setDoc(userDocRef, {
+        displayName,
+        email,
+        createdAt,
+        ...info
+      });
+    } catch (error) {
+      console.log('error creating the user', error.message);
+    }
+  }
 
+  return userDocRef;
+};
 
-}
+export const createAuthUserWithEmailAndPassword = async (email, password) => {
+  if (!email || !password) return;
+
+  return await createUserWithEmailAndPassword(auth, email, password);
+};
+
